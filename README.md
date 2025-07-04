@@ -1,11 +1,11 @@
-# tidstrom
+# tidström
 
 A high-performance time-based buffer for time-series data like video frames, sensor readings, or events.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/alesr/tidstrom.svg)](https://pkg.go.dev/github.com/alesr/tidstrom)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## What is tidstrom?
+## What is tidström?
 
 `tidstrom` maintains a sliding window of time-series data frames, automatically discarding outdated ones. It's designed for applications that need efficient management of time-based data with minimal GC pressure.
 
