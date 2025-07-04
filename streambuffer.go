@@ -20,8 +20,6 @@ const (
 	defaultBufferCapacity = 300
 )
 
-var errContextCanceled = errors.New("operation canceled by context")
-
 // Frame represents a single data entry with timing and sequence metadata.
 type Frame struct {
 	Data      []byte    // actual frame data

@@ -312,15 +312,17 @@ func TestStreamBufferShutdown(t *testing.T) {
 	}
 
 	// queue additional frames
+	var framesQueued int
 	additionalFrames := 100
+FrameLoop:
 	for i := range additionalFrames {
 		select {
 		case input <- fmt.Appendf(nil, "Extra frame %d", i):
 			// successfully queued
+			framesQueued++
 		default:
 			// channel full
-			additionalFrames = i
-			break
+			break FrameLoop
 		}
 	}
 
