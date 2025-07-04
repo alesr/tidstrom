@@ -14,6 +14,7 @@ concurrency:
 permissions:
   contents: read
   actions: read
+  id-token: write
 
 jobs:
   setup:
@@ -104,6 +105,12 @@ jobs:
           name: coverage-report
           path: coverage.out
           retention-days: 7
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: alesr/tidstrom
 
   verify-mod:
     name: Verify Module
