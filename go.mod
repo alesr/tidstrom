@@ -2,7 +2,10 @@ module github.com/alesr/tidstrom
 
 go 1.24.3
 
-require github.com/stretchr/testify v1.10.0
+require (
+	github.com/stretchr/testify v1.10.0
+	gocv.io/x/gocv v0.41.0
+)
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
