@@ -135,10 +135,6 @@ The buffer uses an internal buffer pool to minimize GC pressure:
 - Window (time) and Capacity (count) limits operate independently
 - Target utilization is ~83.9% with default settings (due to 20% safety margin)
 
-## Complete Example
-
-See the [examples directory](examples/main.go) for a complete volleyball camera recording system example.
-
 ## License
 
 MIT
