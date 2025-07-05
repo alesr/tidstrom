@@ -248,7 +248,7 @@ func TestStreamBufferConcurrency(t *testing.T) {
 			cancel()
 
 			if err != nil {
-				t.Errorf("Failed to get snapshot: %v", err)
+				t.Errorf("could not get snapshot: %v", err)
 				continue
 			}
 

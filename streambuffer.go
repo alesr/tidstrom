@@ -3,10 +3,14 @@ package tidstrom
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
+	"io"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/oklog/ulid/v2"
 )
 
 const (
@@ -22,17 +26,19 @@ const (
 
 // Frame represents a single data entry with timing and sequence metadata.
 type Frame struct {
-	Data      []byte    // actual frame data
-	Timestamp time.Time // capture time
-	Sequence  uint64    // unique monotonic ID
+	ID        string    `json:"id"`
+	Data      []byte    `json:"data"`      // actual frame data
+	Timestamp time.Time `json:"timestamp"` // capture time
+	Sequence  uint64    `json:"sequence"`  // unique monotonic ID
 }
 
 // Snapshot contains a point-in-time copy of frames within the buffer.
 type Snapshot struct {
-	Frames    []Frame   // ordered collection of frames
-	StartTime time.Time // timestamp of oldest frame
-	EndTime   time.Time // timestamp of newest frame
-	Timestamp time.Time // when snapshot was created
+	ID        string    `json:"id"`
+	Frames    []Frame   `json:"frames"`     // ordered collection of frames
+	StartTime time.Time `json:"start_time"` // timestamp of oldest frame
+	EndTime   time.Time `json:"end_time"`   // timestamp of newest frame
+	Timestamp time.Time `json:"timestamp"`  // when snapshot was created
 }
 
 // snapshotRequest bundles the context and result channel for a snapshot request.
@@ -48,8 +54,9 @@ type StreamBuffer struct {
 	window         time.Duration
 	capacity       int
 	bufferPool     *bufferPool
-	frameSize      int // hint for expected frame size
-	maxRecycleSize int // maximum size of buffers to recycle
+	frameSize      int       // hint for expected frame size
+	maxRecycleSize int       // maximum size of buffers to recycle
+	entropy        io.Reader // ID generation
 
 	// internal state
 	frames       []Frame     // circular buffer
@@ -80,7 +87,8 @@ type StreamBuffer struct {
 // NewStreamBuffer creates a new StreamBuffer with the specified options.
 // The returned StreamBuffer is not started; call Start() to begin processing.
 func NewStreamBuffer(opts ...StreamBufferOption) *StreamBuffer {
-	sb := &StreamBuffer{
+	entropy := ulid.Monotonic(rand.Reader, 0)
+	sb := StreamBuffer{
 		window:         defaultWindowDuration,
 		capacity:       defaultBufferCapacity,
 		frameSize:      1024 * 1024, // 1MB
@@ -90,10 +98,11 @@ func NewStreamBuffer(opts ...StreamBufferOption) *StreamBuffer {
 		lastFrameTime:  time.Time{},
 		snapReq:        make(chan snapshotRequest, 10),
 		shutdown:       make(chan struct{}),
+		entropy:        entropy,
 	}
 
 	for _, opt := range opts {
-		opt(sb)
+		opt(&sb)
 	}
 
 	sb.frames = make([]Frame, sb.capacity)
@@ -102,7 +111,7 @@ func NewStreamBuffer(opts ...StreamBufferOption) *StreamBuffer {
 	if sb.input == nil {
 		sb.input = make(chan []byte, 100)
 	}
-	return sb
+	return &sb
 }
 
 // Start begins processing incoming frames in a background goroutine.
@@ -110,7 +119,6 @@ func (sb *StreamBuffer) Start() {
 	if sb.finalStopped.Load() {
 		return // prevent restart after Stop
 	}
-
 	if sb.running.CompareAndSwap(false, true) {
 		sb.shutdownMu.Lock()
 		if sb.shutdown == nil {
@@ -262,6 +270,7 @@ func (sb *StreamBuffer) createSnapshot() *Snapshot {
 
 	if sb.count == 0 {
 		return &Snapshot{
+			ID:        sb.makeID(),
 			Frames:    []Frame{},
 			StartTime: time.Time{},
 			EndTime:   time.Time{},
@@ -282,11 +291,11 @@ func (sb *StreamBuffer) createSnapshot() *Snapshot {
 		dataCopy = append(dataCopy, srcFrame.Data...)
 
 		frames[i] = Frame{
+			ID:        sb.makeID(),
 			Data:      dataCopy,
 			Timestamp: srcFrame.Timestamp,
 			Sequence:  srcFrame.Sequence,
 		}
-
 		if i == 0 {
 			startTime = srcFrame.Timestamp
 		}
@@ -294,8 +303,8 @@ func (sb *StreamBuffer) createSnapshot() *Snapshot {
 			endTime = srcFrame.Timestamp
 		}
 	}
-
 	return &Snapshot{
+		ID:        sb.makeID(),
 		Frames:    frames,
 		StartTime: startTime,
 		EndTime:   endTime,
@@ -365,7 +374,7 @@ func (sb *StreamBuffer) GetMetrics() Metrics {
 	capacity := sb.capacity
 	sb.mu.RUnlock()
 
-	utilization := 0.0
+	var utilization float64
 	if capacity > 0 {
 		utilization = float64(count) / float64(capacity)
 	}
@@ -386,4 +395,8 @@ func (sb *StreamBuffer) GetMetrics() Metrics {
 // IsRunning returns whether the StreamBuffer is currently running.
 func (sb *StreamBuffer) IsRunning() bool {
 	return sb.running.Load() && !sb.finalStopped.Load()
+}
+
+func (sb *StreamBuffer) makeID() string {
+	return ulid.MustNew(ulid.Timestamp(time.Now()), sb.entropy).String()
 }
