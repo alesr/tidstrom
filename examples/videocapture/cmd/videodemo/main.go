@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/alesr/tidstrom/example/videocapture"
+	"github.com/alesr/tidstrom/examples/videocapture"
 )
 
 func main() {

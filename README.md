@@ -137,7 +137,7 @@ The buffer uses an internal buffer pool to minimize GC pressure:
 
 ## Complete Example
 
-See the [example directory](example/main.go) for a complete volleyball camera recording system example.
+See the [examples directory](examples/main.go) for a complete volleyball camera recording system example.
 
 ## License
 
