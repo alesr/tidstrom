@@ -8,7 +8,7 @@ type bufferPool struct {
 	maxSize int
 }
 
-// bufferPoolOption defines a functional option for configuring bufferPool.
+// bufferPoolOption defines an option for configuring bufferPool.
 type bufferPoolOption func(*bufferPool)
 
 // withMaxBufferSize sets the maximum size of buffers that will be recycled.
@@ -22,7 +22,7 @@ func withMaxBufferSize(maxSize int) bufferPoolOption {
 
 // newBufferPool creates a new buffer pool with the given size hint and optional configurations.
 func newBufferPool(sizeHint int, opts ...bufferPoolOption) *bufferPool {
-	bp := &bufferPool{
+	bp := bufferPool{
 		pool: sync.Pool{
 			New: func() any {
 				return make([]byte, 0, sizeHint)
@@ -31,9 +31,9 @@ func newBufferPool(sizeHint int, opts ...bufferPoolOption) *bufferPool {
 		maxSize: defaultMaxBufferSize,
 	}
 	for _, opt := range opts {
-		opt(bp)
+		opt(&bp)
 	}
-	return bp
+	return &bp
 }
 
 // get retrieves a byte slice from the pool.
