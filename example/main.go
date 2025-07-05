@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alesr/tidstrom"
+	"github.com/alesr/tidstrom/streambuffer"
 )
 
 func main() {
@@ -19,10 +19,10 @@ func main() {
 	fmt.Println("------------------------------------------------")
 
 	// buffer configuration for 30 seconds of 30fps video at ~1MB per frame
-	buffer := tidstrom.NewStreamBuffer(
-		tidstrom.WithCapacity(900),
-		tidstrom.WithFrameSize(1024*1024),
-		tidstrom.WithInputBuffer(60), // buffer 2 seconds of frames
+	buffer := streambuffer.NewStreamBuffer(
+		streambuffer.WithCapacity(900),
+		streambuffer.WithFrameSize(1024*1024),
+		streambuffer.WithInputBuffer(60), // buffer 2 seconds of frames
 	)
 
 	// context for coordinating graceful shutdown
@@ -141,7 +141,7 @@ func generateVideoFrame(frameNum int, size int) []byte {
 }
 
 // simulateHighlightCapture triggers highlight capture at random intervals.
-func simulateHighlightCapture(ctx context.Context, buffer *tidstrom.StreamBuffer, wg *sync.WaitGroup) {
+func simulateHighlightCapture(ctx context.Context, buffer *streambuffer.StreamBuffer, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	// allow buffer to accumulate some frames before first capture
@@ -170,13 +170,13 @@ func simulateHighlightCapture(ctx context.Context, buffer *tidstrom.StreamBuffer
 			}
 
 			// process the captured highlight
-			processHighlight(i+1, snapshot)
+			processHighlight(i+1, *snapshot)
 		}
 	}
 }
 
 // processHighlight analyzes and saves a captured highlight.
-func processHighlight(id int, snapshot tidstrom.Snapshot) {
+func processHighlight(id int, snapshot streambuffer.Snapshot) {
 	frameCount := len(snapshot.Frames)
 	if frameCount == 0 {
 		fmt.Println("❌ No frames in highlight!")
@@ -247,12 +247,4 @@ func extractHeaderText(data []byte) string {
 	}
 
 	return string(data[:headerEnd])
-}
-
-// min returns the smaller of a and b.
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
