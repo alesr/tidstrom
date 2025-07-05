@@ -1,5 +1,5 @@
-// Package streambuffer provides a high-performance time-based buffer for time-series data.
-package streambuffer
+// Package tidstrom provides a high-performance time-based buffer for time-series data.
+package tidstrom
 
 import (
 	"context"

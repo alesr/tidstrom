@@ -1,4 +1,4 @@
-package streambuffer
+package tidstrom
 
 import "time"
 

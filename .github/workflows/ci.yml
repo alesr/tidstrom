@@ -22,7 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       go-version: ${{ steps.go-version.outputs.version }}
-      modules: ${{ steps.find-modules.outputs.modules }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -31,16 +30,6 @@ jobs:
         id: go-version
         run: |
           echo "version=$(grep -oP '^go \K\d+\.\d+(\.\d+)?' go.mod)" >> $GITHUB_OUTPUT
-
-      - name: Install jq
-        run: sudo apt-get install -y jq
-
-      - name: Find Go modules
-        id: find-modules
-        run: |
-          MODULES=$(find . -name "go.mod" -exec dirname {} \; | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "modules=${MODULES}" >> $GITHUB_OUTPUT
-          echo "Found modules: ${MODULES}"
 
   lint:
     name: Lint
@@ -56,11 +45,9 @@ jobs:
           go-version: ${{ needs.setup.outputs.go-version }}
           cache: true
 
-      - name: Install jq
-        run: sudo apt-get install -y jq
-
       - name: Go Format
         run: |
+          # -s simplifies code, -d displays diff, -e reports all errors
           gofmt_output=$(gofmt -s -d -e .)
           if [ -n "$gofmt_output" ]; then
             echo "Go code is not properly formatted:"
@@ -70,13 +57,9 @@ jobs:
 
       - name: Go Vet
         run: |
-          # Process each module directory
-          for module in $(echo '${{ needs.setup.outputs.modules }}' | jq -r '.[]'); do
-            echo "Running go vet in module: $module"
-            cd $module
-            go vet -all -composites=false -printfuncs=Debugf,Infof,Warnf,Errorf,Logf,Fatalf ./... || exit 1
-            cd $GITHUB_WORKSPACE
-          done
+          # -all enables all checks, -composites=false disables composite literals check
+          # -printfuncs adds custom format functions to check
+          go vet -all -composites=false -printfuncs=Debugf,Infof,Warnf,Errorf,Logf,Fatalf ./...
 
   test:
     name: Test Go ${{ matrix.go-version }}
@@ -97,23 +80,11 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache: true
 
-      - name: Install OpenCV dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libopencv-dev
-
       - name: Get dependencies
         run: go mod download
 
       - name: Run tests
-        run: |
-          # Process each module directory
-          for module in $(echo '${{ needs.setup.outputs.modules }}' | jq -r '.[]'); do
-            echo "Running tests in module: $module"
-            cd $module
-            go test -v -race -count=1 -timeout 5m ./... || exit 1
-            cd $GITHUB_WORKSPACE
-          done
+        run: go test -v -race -count=1 -timeout 5m ./...
 
   coverage:
     name: Test Coverage
@@ -129,39 +100,8 @@ jobs:
           go-version: ${{ needs.setup.outputs.go-version }}
           cache: true
 
-      - name: Install OpenCV dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libopencv-dev
-
       - name: Generate coverage report
-        run: |
-          # Create a combined coverage file
-          echo "mode: atomic" > coverage.out
-
-          # Process each module directory
-          for module in $(echo '${{ needs.setup.outputs.modules }}' | jq -r '.[]'); do
-            echo "Generating coverage for module: $module"
-            cd $module
-
-            if [ "$module" != "." ]; then
-              # For non-root modules
-              go test -coverprofile=module_coverage.out -covermode=atomic ./...
-              if [ -f module_coverage.out ]; then
-                tail -n +2 module_coverage.out >> $GITHUB_WORKSPACE/coverage.out
-                rm module_coverage.out
-              fi
-            else
-              # For root module
-              go test -coverprofile=root_coverage.out -covermode=atomic ./...
-              if [ -f root_coverage.out ]; then
-                tail -n +2 root_coverage.out >> $GITHUB_WORKSPACE/coverage.out
-                rm root_coverage.out
-              fi
-            fi
-
-            cd $GITHUB_WORKSPACE
-          done
+        run: go test -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -190,24 +130,14 @@ jobs:
           go-version: ${{ needs.setup.outputs.go-version }}
           cache: true
 
-      - name: Install OpenCV dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libopencv-dev
-
       - name: Verify go.mod
         run: |
-          # Process each module directory
-          for module in $(echo '${{ needs.setup.outputs.modules }}' | jq -r '.[]'); do
-            echo "Verifying go.mod in module: $module"
-            cd $module
-            go mod tidy
-            if ! git diff --exit-code go.mod go.sum; then
-              echo "go.mod or go.sum in $module needs to be updated. Run 'go mod tidy' locally and commit changes."
-              exit 1
-            fi
-            cd $GITHUB_WORKSPACE
-          done
+          go mod tidy
+          # Check if go.mod or go.sum were modified by go mod tidy
+          if ! git diff --exit-code go.mod go.sum; then
+            echo "go.mod or go.sum needs to be updated. Run 'go mod tidy' locally and commit changes."
+            exit 1
+          fi
 
   build:
     name: Build
@@ -223,23 +153,8 @@ jobs:
           go-version: ${{ needs.setup.outputs.go-version }}
           cache: true
 
-      - name: Install OpenCV dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libopencv-dev
-
       - name: Build
-        run: |
-          # Process each module directory
-          for module in $(echo '${{ needs.setup.outputs.modules }}' | jq -r '.[]'); do
-            echo "Building module: $module"
-            cd $module
-
-            # Build everything in the module
-            go build -v ./... || exit 1
-
-            cd $GITHUB_WORKSPACE
-          done
+        run: go build -v ./...
 
   sync:
     name: Sync Status
