@@ -62,7 +62,7 @@ snapshot, err := buffer.GetSnapshot(ctx)
 cancel()
 
 if err != nil {
-    log.Fatalf("Failed to get snapshot: %v", err)
+    log.Fatalf("could not get snapshot: %v", err)
 }
 
 // process snapshot frames
