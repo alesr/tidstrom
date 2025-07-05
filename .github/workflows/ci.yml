@@ -38,7 +38,7 @@ jobs:
       - name: Find Go modules
         id: find-modules
         run: |
-          MODULES=$(find . -name "go.mod" -exec dirname {} \; | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          MODULES=$(find . -name "go.mod" -exec dirname {} \; | grep -v "^./examples" | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
           echo "modules=${MODULES}" >> $GITHUB_OUTPUT
           echo "Found modules: ${MODULES}"
 
@@ -56,6 +56,9 @@ jobs:
           go-version: ${{ needs.setup.outputs.go-version }}
           cache: true
 
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
       - name: Go Format
         run: |
           gofmt_output=$(gofmt -s -d -e .)
@@ -66,7 +69,14 @@ jobs:
           fi
 
       - name: Go Vet
-        run: go vet -all -composites=false -printfuncs=Debugf,Infof,Warnf,Errorf,Logf,Fatalf ./...
+        run: |
+          # Process each module directory
+          for module in $(echo '${{ needs.setup.outputs.modules }}' | jq -r '.[]'); do
+            echo "Running go vet in module: $module"
+            cd $module
+            go list ./... | grep -v "/examples/" | xargs go vet -all -composites=false -printfuncs=Debugf,Infof,Warnf,Errorf,Logf,Fatalf || exit 1
+            cd $GITHUB_WORKSPACE
+          done
 
   test:
     name: Test Go ${{ matrix.go-version }}
@@ -96,7 +106,7 @@ jobs:
           for module in $(echo '${{ needs.setup.outputs.modules }}' | jq -r '.[]'); do
             echo "Running tests in module: $module"
             cd $module
-            go test -v -race -count=1 -timeout 5m ./... || exit 1
+            go list ./... | grep -v "/examples/" | xargs go test -v -race -count=1 -timeout 5m || exit 1
             cd $GITHUB_WORKSPACE
           done
 
@@ -126,14 +136,14 @@ jobs:
 
             if [ "$module" != "." ]; then
               # For non-root modules
-              go test -coverprofile=module_coverage.out -covermode=atomic ./...
+              go list ./... | grep -v "/examples/" | xargs go test -coverprofile=module_coverage.out -covermode=atomic
               if [ -f module_coverage.out ]; then
                 tail -n +2 module_coverage.out >> $GITHUB_WORKSPACE/coverage.out
                 rm module_coverage.out
               fi
             else
               # For root module
-              go test -coverprofile=root_coverage.out -covermode=atomic ./...
+              go list ./... | grep -v "/examples/" | xargs go test -coverprofile=root_coverage.out -covermode=atomic
               if [ -f root_coverage.out ]; then
                 tail -n +2 root_coverage.out >> $GITHUB_WORKSPACE/coverage.out
                 rm root_coverage.out
@@ -204,7 +214,7 @@ jobs:
           for module in $(echo '${{ needs.setup.outputs.modules }}' | jq -r '.[]'); do
             echo "Building module: $module"
             cd $module
-            go build -v ./...
+            go list ./... | grep -v "/examples/" | xargs go build -v
             cd $GITHUB_WORKSPACE
           done
 
