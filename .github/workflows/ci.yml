@@ -38,7 +38,7 @@ jobs:
       - name: Find Go modules
         id: find-modules
         run: |
-          MODULES=$(find . -name "go.mod" -exec dirname {} \; | grep -v "^./examples" | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          MODULES=$(find . -name "go.mod" -exec dirname {} \; | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
           echo "modules=${MODULES}" >> $GITHUB_OUTPUT
           echo "Found modules: ${MODULES}"
 
@@ -74,7 +74,7 @@ jobs:
           for module in $(echo '${{ needs.setup.outputs.modules }}' | jq -r '.[]'); do
             echo "Running go vet in module: $module"
             cd $module
-            go list ./... | grep -v "/examples/" | xargs go vet -all -composites=false -printfuncs=Debugf,Infof,Warnf,Errorf,Logf,Fatalf || exit 1
+            go vet -all -composites=false -printfuncs=Debugf,Infof,Warnf,Errorf,Logf,Fatalf ./... || exit 1
             cd $GITHUB_WORKSPACE
           done
 
@@ -97,6 +97,11 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache: true
 
+      - name: Install OpenCV dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopencv-dev
+
       - name: Get dependencies
         run: go mod download
 
@@ -106,7 +111,7 @@ jobs:
           for module in $(echo '${{ needs.setup.outputs.modules }}' | jq -r '.[]'); do
             echo "Running tests in module: $module"
             cd $module
-            go list ./... | grep -v "/examples/" | xargs go test -v -race -count=1 -timeout 5m || exit 1
+            go test -v -race -count=1 -timeout 5m ./... || exit 1
             cd $GITHUB_WORKSPACE
           done
 
@@ -124,6 +129,11 @@ jobs:
           go-version: ${{ needs.setup.outputs.go-version }}
           cache: true
 
+      - name: Install OpenCV dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopencv-dev
+
       - name: Generate coverage report
         run: |
           # Create a combined coverage file
@@ -136,14 +146,14 @@ jobs:
 
             if [ "$module" != "." ]; then
               # For non-root modules
-              go list ./... | grep -v "/examples/" | xargs go test -coverprofile=module_coverage.out -covermode=atomic
+              go test -coverprofile=module_coverage.out -covermode=atomic ./...
               if [ -f module_coverage.out ]; then
                 tail -n +2 module_coverage.out >> $GITHUB_WORKSPACE/coverage.out
                 rm module_coverage.out
               fi
             else
               # For root module
-              go list ./... | grep -v "/examples/" | xargs go test -coverprofile=root_coverage.out -covermode=atomic
+              go test -coverprofile=root_coverage.out -covermode=atomic ./...
               if [ -f root_coverage.out ]; then
                 tail -n +2 root_coverage.out >> $GITHUB_WORKSPACE/coverage.out
                 rm root_coverage.out
@@ -180,6 +190,11 @@ jobs:
           go-version: ${{ needs.setup.outputs.go-version }}
           cache: true
 
+      - name: Install OpenCV dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopencv-dev
+
       - name: Verify go.mod
         run: |
           # Process each module directory
@@ -208,6 +223,11 @@ jobs:
           go-version: ${{ needs.setup.outputs.go-version }}
           cache: true
 
+      - name: Install OpenCV dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopencv-dev
+
       - name: Build
         run: |
           # Process each module directory
@@ -215,19 +235,8 @@ jobs:
             echo "Building module: $module"
             cd $module
 
-            if [ "$module" = "." ]; then
-              # For root module, exclude the examples directory
-              PKGS=$(go list ./... | grep -v "/examples/")
-              if [ -n "$PKGS" ]; then
-                echo "Building packages: $PKGS"
-                go build -v $PKGS || exit 1
-              else
-                echo "No packages to build after filtering"
-              fi
-            else
-              # For non-root modules, build everything
-              go build -v ./... || exit 1
-            fi
+            # Build everything in the module
+            go build -v ./... || exit 1
 
             cd $GITHUB_WORKSPACE
           done
