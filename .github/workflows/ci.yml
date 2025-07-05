@@ -214,7 +214,21 @@ jobs:
           for module in $(echo '${{ needs.setup.outputs.modules }}' | jq -r '.[]'); do
             echo "Building module: $module"
             cd $module
-            go list ./... | grep -v "/examples/" | xargs -n1 go build -v
+
+            if [ "$module" = "." ]; then
+              # For root module, exclude the examples directory
+              PKGS=$(go list ./... | grep -v "/examples/")
+              if [ -n "$PKGS" ]; then
+                echo "Building packages: $PKGS"
+                go build -v $PKGS || exit 1
+              else
+                echo "No packages to build after filtering"
+              fi
+            else
+              # For non-root modules, build everything
+              go build -v ./... || exit 1
+            fi
+
             cd $GITHUB_WORKSPACE
           done
 
