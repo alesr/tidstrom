@@ -1,5 +1,5 @@
-// Package tidstrom provides a high-performance time-based buffer for time-series data.
-package tidstrom
+// Package streambuffer provides a high-performance time-based buffer for time-series data.
+package streambuffer
 
 import (
 	"context"
@@ -37,8 +37,8 @@ type Snapshot struct {
 
 // snapshotRequest bundles the context and result channel for a snapshot request.
 type snapshotRequest struct {
-	resultChan chan<- Snapshot // where to send the result
-	ctx        context.Context // for cancellation
+	resultChan chan<- *Snapshot // where to send the result
+	ctx        context.Context  // for cancellation
 }
 
 // StreamBuffer continuously processes incoming data frames, maintaining
@@ -256,12 +256,12 @@ func (sb *StreamBuffer) processFrame(data []byte) {
 }
 
 // createSnapshot returns a deep copy of the current buffer contents.
-func (sb *StreamBuffer) createSnapshot() Snapshot {
+func (sb *StreamBuffer) createSnapshot() *Snapshot {
 	sb.mu.RLock()
 	defer sb.mu.RUnlock()
 
 	if sb.count == 0 {
-		return Snapshot{
+		return &Snapshot{
 			Frames:    []Frame{},
 			StartTime: time.Time{},
 			EndTime:   time.Time{},
@@ -295,7 +295,7 @@ func (sb *StreamBuffer) createSnapshot() Snapshot {
 		}
 	}
 
-	return Snapshot{
+	return &Snapshot{
 		Frames:    frames,
 		StartTime: startTime,
 		EndTime:   endTime,
@@ -311,9 +311,9 @@ func (sb *StreamBuffer) Input() chan<- []byte {
 
 // GetSnapshot returns a point-in-time copy of the buffer contents.
 // It respects context cancellation for timeout support.
-func (sb *StreamBuffer) GetSnapshot(ctx context.Context) (Snapshot, error) {
+func (sb *StreamBuffer) GetSnapshot(ctx context.Context) (*Snapshot, error) {
 	if !sb.running.Load() || sb.finalStopped.Load() {
-		return Snapshot{}, errors.New("stream buffer is not running")
+		return nil, errors.New("stream buffer is not running")
 	}
 
 	sb.shutdownMu.Lock()
@@ -321,10 +321,10 @@ func (sb *StreamBuffer) GetSnapshot(ctx context.Context) (Snapshot, error) {
 	sb.shutdownMu.Unlock()
 
 	if !hasShutdown {
-		return Snapshot{}, errors.New("stream buffer is shutting down")
+		return nil, errors.New("stream buffer is shutting down")
 	}
 
-	resultChan := make(chan Snapshot, 1)
+	resultChan := make(chan *Snapshot, 1)
 	req := snapshotRequest{
 		resultChan: resultChan,
 		ctx:        ctx,
@@ -333,14 +333,14 @@ func (sb *StreamBuffer) GetSnapshot(ctx context.Context) (Snapshot, error) {
 	select {
 	case sb.snapReq <- req:
 	case <-ctx.Done():
-		return Snapshot{}, ctx.Err()
+		return nil, ctx.Err()
 	}
 
 	select {
 	case snapshot := <-resultChan:
 		return snapshot, nil
 	case <-ctx.Done():
-		return Snapshot{}, ctx.Err()
+		return nil, ctx.Err()
 	}
 }
 

@@ -1,4 +1,4 @@
-package tidstrom
+package streambuffer
 
 import "sync"
 
