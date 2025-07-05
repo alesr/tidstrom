@@ -22,6 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       go-version: ${{ steps.go-version.outputs.version }}
+      modules: ${{ steps.find-modules.outputs.modules }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,6 +31,16 @@ jobs:
         id: go-version
         run: |
           echo "version=$(grep -oP '^go \K\d+\.\d+(\.\d+)?' go.mod)" >> $GITHUB_OUTPUT
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Find Go modules
+        id: find-modules
+        run: |
+          MODULES=$(find . -name "go.mod" -exec dirname {} \; | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "modules=${MODULES}" >> $GITHUB_OUTPUT
+          echo "Found modules: ${MODULES}"
 
   lint:
     name: Lint
@@ -80,7 +91,14 @@ jobs:
         run: go mod download
 
       - name: Run tests
-        run: go test -v -race -count=1 -timeout 5m ./...
+        run: |
+          # Process each module directory
+          for module in $(echo '${{ needs.setup.outputs.modules }}' | jq -r '.[]'); do
+            echo "Running tests in module: $module"
+            cd $module
+            go test -v -race -count=1 -timeout 5m ./... || exit 1
+            cd $GITHUB_WORKSPACE
+          done
 
   coverage:
     name: Test Coverage
@@ -97,7 +115,33 @@ jobs:
           cache: true
 
       - name: Generate coverage report
-        run: go test -coverprofile=coverage.out -covermode=atomic ./...
+        run: |
+          # Create a combined coverage file
+          echo "mode: atomic" > coverage.out
+
+          # Process each module directory
+          for module in $(echo '${{ needs.setup.outputs.modules }}' | jq -r '.[]'); do
+            echo "Generating coverage for module: $module"
+            cd $module
+
+            if [ "$module" != "." ]; then
+              # For non-root modules
+              go test -coverprofile=module_coverage.out -covermode=atomic ./...
+              if [ -f module_coverage.out ]; then
+                tail -n +2 module_coverage.out >> $GITHUB_WORKSPACE/coverage.out
+                rm module_coverage.out
+              fi
+            else
+              # For root module
+              go test -coverprofile=root_coverage.out -covermode=atomic ./...
+              if [ -f root_coverage.out ]; then
+                tail -n +2 root_coverage.out >> $GITHUB_WORKSPACE/coverage.out
+                rm root_coverage.out
+              fi
+            fi
+
+            cd $GITHUB_WORKSPACE
+          done
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -128,11 +172,17 @@ jobs:
 
       - name: Verify go.mod
         run: |
-          go mod tidy
-          if ! git diff --exit-code go.mod go.sum; then
-            echo "go.mod or go.sum needs to be updated. Run 'go mod tidy' locally and commit changes."
-            exit 1
-          fi
+          # Process each module directory
+          for module in $(echo '${{ needs.setup.outputs.modules }}' | jq -r '.[]'); do
+            echo "Verifying go.mod in module: $module"
+            cd $module
+            go mod tidy
+            if ! git diff --exit-code go.mod go.sum; then
+              echo "go.mod or go.sum in $module needs to be updated. Run 'go mod tidy' locally and commit changes."
+              exit 1
+            fi
+            cd $GITHUB_WORKSPACE
+          done
 
   build:
     name: Build
@@ -149,7 +199,14 @@ jobs:
           cache: true
 
       - name: Build
-        run: go build -v ./...
+        run: |
+          # Process each module directory
+          for module in $(echo '${{ needs.setup.outputs.modules }}' | jq -r '.[]'); do
+            echo "Building module: $module"
+            cd $module
+            go build -v ./...
+            cd $GITHUB_WORKSPACE
+          done
 
   sync:
     name: Sync Status
