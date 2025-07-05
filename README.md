@@ -2,8 +2,9 @@
 
 A high-performance time-based buffer for time-series data like video frames, sensor readings, or events.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/alesr/tidstrom.svg)](https://pkg.go.dev/github.com/alesr/tidstrom)
+[![codecov](https://codecov.io/gh/alesr/tidstrom/graph/badge.svg?token=3NjbYgdNLY)](https://codecov.io/gh/alesr/tidstrom)
 [![Go Report Card](https://goreportcard.com/badge/github.com/alesr/tidstrom)](https://goreportcard.com/report/github.com/alesr/tidstrom)
+[![Go Reference](https://pkg.go.dev/badge/github.com/alesr/tidstrom.svg)](https://pkg.go.dev/github.com/alesr/tidstrom)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## What is tidström?
