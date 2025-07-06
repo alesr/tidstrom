@@ -1,5 +1,3 @@
-github.com/alesr/tidstrom/streambuffer v0.0.0-20250705124542-147ec81d790b h1:iSuDJwc0dL3ZFPgDZOK0uXjO7fvgDdiLzzxHRkKviWQ=
-github.com/alesr/tidstrom/streambuffer v0.0.0-20250705124542-147ec81d790b/go.mod h1:ARS40IgVbqYwUhsG36j3eifvUPYMnR8l62DXE3E8b/E=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/oklog/ulid/v2 v2.1.1 h1:suPZ4ARWLOJLegGFiZZ1dFAkqzhMjL3J1TzI+5wHz8s=
