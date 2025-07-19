@@ -172,18 +172,15 @@ jobs:
               run_id: context.runId,
             });
 
-            // Filter for only the jobs we depend on
             const dependentJobs = jobs.data.jobs.filter(job =>
               ['lint', 'test', 'coverage', 'verify-mod', 'build'].includes(job.name.toLowerCase()));
 
-            // Check if any job has failed
             const failedJobs = dependentJobs.filter(job => job.conclusion !== 'success');
 
             if (failedJobs.length > 0) {
               core.setFailed(`The following jobs have failed: ${failedJobs.map(job => job.name).join(', ')}`);
               return;
             }
-
             console.log('All required jobs have completed successfully.');
 
       - name: Set final status
